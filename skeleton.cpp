@@ -1,35 +1,116 @@
 ﻿// skeleton.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
+// Remember to Change the IP Address !!!
 
 
 #include "pch.h"
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <time.h>
 //网络连接
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <WinSock2.h>
 #include <stdio.h>
-#define SERVER_PORT 5099
-#define MAX_BUFF_SIZE 1024
+#define SERVER_PORT 5099 //Keep it same with the program running on Ubuntu
+#define MAX_BUFF_SIZE 4096
 // OpenCV 头文件
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 // Kinect for Windows SDK 头文件
 #include <Kinect.h>
+constexpr auto ALPHA = 0.35;
+constexpr auto EPXLON = 0.015;
+constexpr auto SLEEP_TIME = 50;
+constexpr auto PI = 3.1415926535897932384626;
+
+float joint[8][3] = { 0 };//全局变量
+
+
 
 using namespace std;
 using namespace cv;
 #pragma comment(lib, "ws2_32.lib")
 
-const   string  get_name(int n);    //此函数判断出关节点的名字
+
+const string  get_name(int n);    //此函数判断出关节点的名字
 void DrawLine(Mat& Img, const Joint& r1, const Joint& r2, ICoordinateMapper* pMapper);
+
+
+void getmag(Joint J1, Joint J2, float (&mag)[3])
+{
+	mag[0] = J2.Position.X - J1.Position.X;
+	mag[1] = J2.Position.Y - J1.Position.Y;
+	mag[2] = J2.Position.Z - J1.Position.Z;
+}
+
+//点乘
+float dotpro(float mag1[], float mag2[])
+{
+	return mag1[0] * mag2[0] + mag1[1] * mag2[1] + mag1[2] * mag2[2];
+}
+
+//叉乘
+void mulcro(float mag1[], float mag2[], float (&mag3)[3])
+{
+	mag3[0] = mag1[1] * mag2[2] - mag1[2] * mag2[1];
+	mag3[1] = mag1[2] * mag2[0] - mag1[0] * mag2[2];
+	mag3[2] = mag1[0] * mag2[1] - mag1[1] * mag2[0];
+}
+
+//返回两向量夹角
+float GetVecAng(float mag1[], float mag2[])
+{
+	return acos(dotpro(mag1, mag2) / sqrt(dotpro(mag1, mag1)*dotpro(mag2, mag2)));
+}
+void realupdate(float s0_L, float s1_L, float e0_L, float e1_L, float w1_L, float s0_R, float s1_R, float e0_R, float e1_R, float w1_R)
+{
+	s0_L = s0_L > PI / 2 ? PI / 2 : s0_L;
+	s0_L = s0_L < -PI / 2 ? -PI / 2 : s0_L;
+	s1_L = s1_L > PI / 3 ? PI / 3 : s1_L;
+	s1_L = s1_L < -2 * PI / 3 ? -2 * PI / 3 : s1_L;
+	e0_L = e0_L > 5 * PI / 6 ? 5 * PI / 6 : e0_L;
+	e0_L = e0_L < -5 * PI / 6 ? -5 * PI / 6 : e0_L;
+	e1_L = e1_L > 5 * PI / 6 ? 5 * PI / 6 : e1_L;
+	e1_L = e1_L < 0 ? 0 : e1_L;
+	w1_L = w1_L > 2 * PI / 3 ? 2 * PI / 3 : w1_L;
+	w1_L = w1_L < -PI / 2 ? -PI / 2 : w1_L;
+
+	s0_R = s0_R > PI / 2 ? PI / 2 : s0_R;
+	s0_R = s0_R < -PI / 2 ? -PI / 2 : s0_R;
+	s1_R = s1_R > PI / 3 ? PI / 3 : s1_R;
+	s1_R = s1_R < -2 * PI / 3 ? -2 * PI / 3 : s1_R;
+	e0_R = e0_R > 5 * PI / 6 ? 5 * PI / 6 : e0_R;
+	e0_R = e0_R < -5 * PI / 6 ? -5 * PI / 6 : e0_R;
+	e1_R = e1_R > 5 * PI / 6 ? 5 * PI / 6 : e1_R;
+	e1_R = e1_R < 0 ? 0 : e1_R;
+	w1_R = w1_R > 2 * PI / 3 ? 2 * PI / 3 : w1_R;
+	w1_R = w1_R < -PI / 2 ? -PI / 2 : w1_R;
+}
+
+void update(Joint J[])
+{
+	for (int i = 0; i < 8; i++)
+	{
+		if (abs(joint[i][0] - J[i + 4].Position.X) > EPXLON)
+			joint[i][0] = ALPHA * J[i + 4].Position.X + (1 - ALPHA)*joint[i][0];
+		if (abs(joint[i][1] - J[i + 4].Position.Y) > EPXLON)
+			joint[i][1] = ALPHA * J[i + 4].Position.Y + (1 - ALPHA)*joint[i][1];
+		if (abs(joint[i][2] - J[i + 4].Position.Z) > EPXLON)
+			joint[i][2] = ALPHA * J[i + 4].Position.Z + (1 - ALPHA)*joint[i][2];
+	}
+}
+void getmag(float  J1[], float J2[], float(&mag)[3])
+{
+	mag[0] = J2[0] - J1[0];
+	mag[1] = J2[1] - J1[1];
+	mag[2] = J2[2] - J1[2];
+}
 
 int main()
 {
 	//--------TCP/IP服务---------------
-	char sever_IP[20] = "192.168.0.20";//
+	char sever_IP[20] = "192.168.0.7";//
 	//cout << "目标IP";
 	//cin >> sever_IP;
 
@@ -42,7 +123,6 @@ int main()
 		cout<<"Failed to load Winsock"<<endl;
 		return 0;
 	}
-
 	SOCKADDR_IN addrSrv;
 	addrSrv.sin_family = AF_INET;
 	addrSrv.sin_port = htons(SERVER_PORT);
@@ -58,8 +138,7 @@ int main()
 		cout << "Connect failed:"<< WSAGetLastError()<<endl;
 		return 0;
 	}
-
-	char buffSend[5000];	
+	char buffSend[MAX_BUFF_SIZE];	
 
 	//发送数据
 	/*cout << "q to quit" << endl;
@@ -125,9 +204,13 @@ int main()
 	pSensor->get_CoordinateMapper(&pCoordinateMapper);
 	namedWindow("Body Image");
 	namedWindow("colorImage");
-
+	time_t time_old = clock();
 	while (1)
 	{
+		time_t time_now = clock();
+		if (difftime(time_now,time_old) < SLEEP_TIME)continue;
+		time_old = time_now;
+
 		// 4a. 读取彩色图像并输出到矩阵
 		IColorFrame* pColorFrame = nullptr;
 		if (pColorFrameReader->AcquireLatestFrame(&pColorFrame) == S_OK)
@@ -186,53 +269,83 @@ int main()
 							DrawLine(mImg, aJoints[JointType_KneeRight], aJoints[JointType_AnkleRight], pCoordinateMapper);
 							DrawLine(mImg, aJoints[JointType_AnkleRight], aJoints[JointType_FootRight], pCoordinateMapper);
 
-							//
+							//----关节角输出与映射---------
+							//----mapping ---------------
 
 							JointOrientation aOrientations[JointType::JointType_Count];
 							if (pBody->GetJointOrientations(JointType::JointType_Count, aOrientations) == S_OK)
 							{
 								string str;
 								stringstream ss;
-								for (int i = 4; i <12; i++) {
+								//Joint information Left Limb and Right Limb
+								/*for (int i = 4; i <12; i++) {
 									cout << "J" << i << "(" << get_name(i) << ")" << endl;
 									cout << " pos[" << aJoints[i].Position.X << "," << aJoints[i].Position.Y << "," << aJoints[i].Position.Z << "]" << endl;
 									cout << " ori[" << aOrientations[i].Orientation.w<<"," << aOrientations[i].Orientation.x << "," << aOrientations[i].Orientation.y << "," << aOrientations[i].Orientation.z <<"]"<< endl;
 									cout << endl;
+								}*/
 
-									//ss << i;
-									//ss << i << ":" << aJoints[i].Position.X << "," << aJoints[i].Position.Y << "," << aJoints[i].Position.Z << ":" << aOrientations[i].Orientation.w << "," << aOrientations[i].Orientation.x << "," << aOrientations[i].Orientation.y << "," << aOrientations[i].Orientation.z << endl;
-									
-									//ss = i+':';
-									//ss += aJoints[i].Position.X; ss += ','; ss += aJoints[i].Position.Y; ss += ','; ss += aJoints[i].Position.Z; ss += ':';
-									//ss += aOrientations[i].Orientation.w; ss += ','; ss += aOrientations[i].Orientation.x; ss += ','; ss += aOrientations[i].Orientation.y; ss += ','; ss += aOrientations[i].Orientation.z;
-									//ss << " pos[" << aJoints[i].Position.X << "," << aJoints[i].Position.Y << "," << aJoints[i].Position.Z << "]" << endl;
-									//ss << " ori[" << aOrientations[i].Orientation.w<<"," << aOrientations[i].Orientation.x << "," << aOrientations[i].Orientation.y << "," << aOrientations[i].Orientation.z <<"]"<< endl;
-									//ss << endl;
-									
-									
-								}
-								float j45[3] = { aJoints[5].Position.X - aJoints[4].Position.X,aJoints[5].Position.Y - aJoints[4].Position.Y,aJoints[5].Position.Z - aJoints[4].Position.Z };
-								float j56[3] = { aJoints[6].Position.X - aJoints[5].Position.X,aJoints[6].Position.Y - aJoints[5].Position.Y,aJoints[6].Position.Z - aJoints[5].Position.Z };
+								//mapping
+								update(aJoints);
 								
-								float s0_l = -atan(j45[2] / j45[0]) + 0.785;
-								float s1_l = 1.57 - acos(-j45[1] / sqrt(j45[0] * j45[0] + j45[1] * j45[1] + j45[2] * j45[2]));
-								float e1_l = acos((j45[0] * j56[0] + j45[1] * j56[1] + j45[2] * j56[2]) / (sqrt(j45[0] * j45[0] + j45[1] * j45[1] + j45[2] * j45[2])*sqrt(j56[0] * j56[0] + j56[1] * j56[1] + j56[2] * j56[2])));
-								
-								float n1[3] = { -j45[2],0,j45[0] };
-								float n2[3] = { j45[1] * j56[2] - j45[2] * j56[1], j45[2] * j56[0] - j45[0] * j56[2], j45[0] * j56[1] - j45[1] * j56[0] };
-								float e0_l = -3.14 + acos((n1[0] * n2[0] + n1[1] * n2[1] + n1[2] * n2[2]) / (sqrt(n1[0] * n1[0] + n1[1] * n1[1] + n1[2] * n1[2])*sqrt(n2[0] * n2[0] + n2[1] * n2[1] + n2[2] * n2[2])));
-											
-								float w1_l = 0;
-								//float deg = 180 / 3.14159;
-								ss << s0_l << "," << s1_l << "," << e0_l << ","<< e1_l <<","<<w1_l<< endl;
-								//cout << ss.str()<<endl;
+								float m45[3], m56[3], m67[3], m89[3], m90[3], m01[3], n1[3], n2[3];
+								float z[3] = { 0,1,0 };
+								float s0_L, s1_L, e0_L, e1_L, w1_L, s0_R, s1_R, e0_R, e1_R, w1_R;
+								getmag(joint[0], joint[1], m45);
+								getmag(joint[1], joint[2], m56);
+								getmag(joint[2], joint[3], m67);
+								getmag(joint[4], joint[5], m89);
+								getmag(joint[5], joint[6], m90);
+								getmag(joint[6], joint[7], m01);
+
+								/*float m45[3], m56[3], m67[3], m89[3], m90[3], m01[3], n1[3], n2[3];
+								float z[3] = { 0,1,0 };
+								float s0_L, s1_L, e0_L, e1_L, w1_L, s0_R, s1_R, e0_R, e1_R, w1_R;
+								getmag(aJoints[4], aJoints[5], m45);
+								getmag(aJoints[5], aJoints[6], m56);
+								getmag(aJoints[6], aJoints[7], m67);
+								getmag(aJoints[8], aJoints[9],m89);
+								getmag(aJoints[9], aJoints[10], m90);
+								getmag(aJoints[10], aJoints[11], m01);*/
+
+								//left
+								mulcro(m45, z, n1);//n1为m45与竖直平面的法向量
+								mulcro(m45, m56, n2);//n2为m45，m56叉乘结果(456平面法向量)
+								s0_L = -atan(m45[2] / m45[0])+PI/6;// +PI / 4;
+								s1_L = PI/2 - acos(-m45[1] / sqrt(dotpro(m45, m45)));
+								e0_L = - PI + GetVecAng(n1, n2);
+								e1_L = GetVecAng(m45, m56);
+								w1_L = GetVecAng(m56, m67);
+
+								//right
+								mulcro(m89, z, n1);//n1为m45与竖直平面的法向量
+								mulcro(m89, m90, n2);//n2为m45，m56叉乘结果(456平面法向量)
+								s0_R = atan(-m89[2] / m89[0])-PI/6;// -PI / 4;
+								s1_R = PI/2 - acos(-m89[1] / sqrt(dotpro(m89, m89)));
+								e0_R = PI - GetVecAng(n1, n2);
+								e1_R = GetVecAng(m89, m90);
+								w1_R = GetVecAng(m90, m01);
+								realupdate(s0_L, s1_L, e0_L, e1_L, w1_L, s0_R, s1_R, e0_R, e1_R, w1_R);
+
+
+								ss << s0_L << "," << s1_L << "," << e0_L << "," << e1_L << "," << w1_L<<",";
+								ss << s0_R << "," << s1_R << "," << e0_R << "," << e1_R << "," << w1_R << endl;
 								str = ss.str();
-								//cout << "str" << str << endl;
 								str.copy(buffSend, str.length(), 0);
 								buffSend[str.length() + 1] = '\0';
-								cout << "char" << buffSend << endl;
+								//cout << "char" << buffSend << endl;
 								send(sockClient, buffSend, strlen(buffSend) + 1, 0);
-								Sleep(5000);
+								//debug
+								//float deg = 180 / 3.14159;	
+								//for (int i = 0; i < 8; i++) {
+								//	cout <<i<<": "<<joint[i][0]<< "," << joint[i][1] <<"," << joint[i][2] << endl;
+								//}
+								//cout << endl;
+								//cout <<"L "<<s0_L*deg << "," << s1_L*deg << "," << e0_L*deg << ","<< e1_L*deg <<","<<w1_L*deg<< endl;
+
+								//cout <<"R "<< s0_R * deg << "," << s1_R * deg << "," << e0_R * deg << "," << e1_R * deg << "," << w1_R * deg <<endl;
+
+								//Sleep(SLEEP_TIME);
 							}
 						}
 					}
