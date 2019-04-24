@@ -10,10 +10,22 @@ import baxter_interface
 from baxter_interface import CHECK_VERSION
 
 
-keys_left = ['left_s0', 'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2']
-keys_right = ['right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2']
+# keys_left = ['left_s0', 'left_s1', 'left_e0', 'left_e1', 'left_w0', 'left_w1', 'left_w2']
+# keys_right = ['right_s0', 'right_s1', 'right_e0', 'right_e1', 'right_w0', 'right_w1', 'right_w2']
 
-angles ={'l':[0,0,0,0,0,0,0],'r':[0,0,0,0,0,0,0]}
+# angles ={'l':[0,0,0,0,0,0,0],'r':[0,0,0,0,0,0,0]}
+angles = [0]*7
+
+def cb_s0(data):
+    angles[0]=data.data
+def cb_s1(data):
+    angles[1]=data.data
+def cb_e0(data):
+    anges[2]=data.data
+def cb_e1(data):
+    angles[3]=data.data
+def cb_w1(data):
+    angles[5]=data.data
 
 # def callback(data):
 #     print 'callback!',data.data
@@ -34,53 +46,64 @@ angles ={'l':[0,0,0,0,0,0,0],'r':[0,0,0,0,0,0,0]}
 #     else:
 #         rospy.loginfo("the count of data is wrong(!=7)")
 
-def cb_ls0(data):
-    #print 'ls0:',data.data,' '
-    angles['l'][0]=data.data
-def cb_ls1(data):
-    #print 'ls1:',data.data,' '
-    angles['l'][1]=data.data
-def cb_le0(data):
-    #print 'le0:',data.data,' '
-    angles['l'][2]=data.data
-def cb_le1(data):
-    #print 'le1:',data.data,' '
-    angles['l'][3]=data.data
-def cb_lw1(data):
-    #print 'lw1:',data.data,' '
-    angles['l'][5]=data.data
+# def cb_ls0(data):
+#     #print 'ls0:',data.data,' '
+#     angles['l'][0]=data.data
+# def cb_ls1(data):
+#     #print 'ls1:',data.data,' '
+#     angles['l'][1]=data.data
+# def cb_le0(data):
+#     #print 'le0:',data.data,' '
+#     angles['l'][2]=data.data
+# def cb_le1(data):
+#     #print 'le1:',data.data,' '
+#     angles['l'][3]=data.data
+# def cb_lw1(data):
+#     #print 'lw1:',data.data,' '
+#     angles['l'][5]=data.data
 
-def cb_rs0(data):
-    #print 'rs0:',data.data,' '
-    angles['r'][0]=data.data
-def cb_rs1(data):
-    #print 'rs1:',data.data,' '
-    angles['r'][1]=data.data    
-def cb_re0(data):
-    #print 're0:',data.data,' '
-    angles['r'][2]=data.data
-def cb_re1(data):
-    #print 're1:',data.data,' '
-    angles['r'][3]=data.data
-def cb_rw1(data):
-    #print 'rw1:',data.data,' '
-    angles['r'][5]=data.data
-
+# def cb_rs0(data):
+#     #print 'rs0:',data.data,' '
+#     angles['r'][0]=data.data
+# def cb_rs1(data):
+#     #print 'rs1:',data.data,' '
+#     angles['r'][1]=data.data    
+# def cb_re0(data):
+#     #print 're0:',data.data,' '
+#     angles['r'][2]=data.data
+# def cb_re1(data):
+#     #print 're1:',data.data,' '
+#     angles['r'][3]=data.data
+# def cb_rw1(data):
+#     #print 'rw1:',data.data,' '
+#     angles['r'][5]=data.data
 
 def main():
+    arg_fmt = argparse.RawDescriptionHelpFormatter
+    parser = argparse.ArgumentParser(formatter_class=arg_fmt,
+                                     description=main.__doc__)
+    required = parser.add_argument_group('required arguments')
+    required.add_argument(
+        "-l", "--limb", required=True, choices=['left', 'right'],
+        help="specify the limb (the control limb)"
+    )
+    args = parser.parse_args(rospy.myargv()[1:])
 
+    name = args.limb
     print("Initializing node... ")
-    rospy.init_node('human_pose_follower')
-    rospy.Subscriber("humanPose/Left/s0", Float64, cb_ls0)
-    rospy.Subscriber("humanPose/Left/s1", Float64, cb_ls1)
-    rospy.Subscriber("humanPose/Left/e0", Float64, cb_le0)
-    rospy.Subscriber("humanPose/Left/e1", Float64, cb_le1)
-    rospy.Subscriber("humanPose/Left/w1", Float64, cb_lw1)
-    rospy.Subscriber("humanPose/Right/s0", Float64, cb_rs0)
-    rospy.Subscriber("humanPose/Right/s1", Float64, cb_rs1)
-    rospy.Subscriber("humanPose/Right/e0", Float64, cb_re0)
-    rospy.Subscriber("humanPose/Right/e1", Float64, cb_re1)
-    rospy.Subscriber("humanPose/Right/w1", Float64, cb_rw1)
+    rospy.init_node('human_pose_follower'+name)
+    rospy.Subscriber("humanPose/"+name+"/s0", Float64, cb_s0)
+    rospy.Subscriber("humanPose/"+name"/s1", Float64, cb_s1)
+    rospy.Subscriber("humanPose/"+name"/e0", Float64, cb_e0)
+    rospy.Subscriber("humanPose/"+name"/e1", Float64, cb_e1)
+    rospy.Subscriber("humanPose/"+name"/w1", Float64, cb_w1)
+    keys = [name+'_s0', name+'_s1', name+'_e0', name+'_e1', name+'_w0', name+'_w1', name+'_w2']
+
+    # rospy.Subscriber("humanPose/"+name"/s0", Float64, cb_rs0)
+    # rospy.Subscriber("humanPose/"+name"/s1", Float64, cb_rs1)
+    # rospy.Subscriber("humanPose/"+name"/e0", Float64, cb_re0)
+    # rospy.Subscriber("humanPose/"+name"/e1", Float64, cb_re1)
+    # rospy.Subscriber("humanPose/"+name"/w1", Float64, cb_rw1)
     print("Getting robot state... ")
     rs = baxter_interface.RobotEnable(CHECK_VERSION)
     init_state = rs.state().enabled
@@ -95,23 +118,23 @@ def main():
     print("Enabling robot... ")
     rs.enable()
     rate = rospy.Rate(20)
-    ll = baxter_interface.Limb('left')
-    rl = baxter_interface.Limb('right')
-    ll.set_joint_position_speed(0.7)
-    rl.set_joint_position_speed(0.7)
-    # ll.move_to_joint_positions({"left_w1":0})
-    # rl.move_to_joint_positions({"right_w1":0})
+    li = baxter_interface.Limb(name)
+    li.set_joint_position_speed(0.8)
+    # ll = baxter_interface.Limb('left')
+    # rl = baxter_interface.Limb('right')
+    # ll.set_joint_position_speed(0.7)
+    # rl.set_joint_position_speed(0.7)
     print("Begin listening")
-    i = 1
     while not rospy.is_shutdown():
-        print i,' move!'
-        i = i+1
-        left = dict(zip(keys_left,angles['l']))
-        right = dict(zip(keys_right,angles['r']))
-        ll.set_joint_position_speed(0.7)
-        rl.set_joint_position_speed(0.7)
-        ll.move_to_joint_positions(left,timeout=0.25,threshold = 0.2)
-        rl.move_to_joint_positions(right,timeout=0.25,threshold = 0.2)
+        angle = dict(zip(keys,angles))
+        li.set_joint_position_speed(0.8)
+        li.move_to_joint_positions(angle,timeout=0.25,threshold=0.2)
+        # left = dict(zip(keys_left,angles['l']))
+        # right = dict(zip(keys_right,angles['r']))
+        # ll.set_joint_position_speed(0.7)
+        # rl.set_joint_position_speed(0.7)
+        # ll.move_to_joint_positions(left,timeout=0.25,threshold = 0.2)
+        # rl.move_to_joint_positions(right,timeout=0.25,threshold = 0.2)
         rate.sleep()
     print("Done.")
 
