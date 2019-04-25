@@ -59,12 +59,12 @@ def main():
     rs.enable()
     rate = rospy.Rate(20)
     li = baxter_interface.Limb(name)
-    li.set_joint_position_speed(0.8)
+    li.set_joint_position_speed(0.6)
     print("Begin listening")
     while not rospy.is_shutdown():
         angle = dict(zip(keys,angles))
         #li.set_joint_position_speed(0.8)
-        li.move_to_joint_positions(angle,timeout=0.3,threshold=0.2)
+        li.move_to_joint_positions(angle,timeout=0.25,threshold=0.4)
         rate.sleep()
     print("Done.")
 
